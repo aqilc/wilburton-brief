@@ -99,9 +99,9 @@ table.chart { border-collapse: collapse; width: 100%; margin: 0; font-family: "S
 .stat small { font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 1px; }
 .statlab { font-size: 12.5px; line-height: 16px; color: var(--muted); margin-top: 1px; text-wrap: balance; }
 .sec { margin-top: 14px; }
-.sechead { display: flex; align-items: center; justify-content: space-between; gap: var(--sp2); min-height: 22px; }
-.sechead h3 { margin: 0; font-size: 13px; font-weight: 600; }
-.sechead .chips { display: flex; gap: var(--sp1); white-space: nowrap; }
+.sechead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp1) var(--sp2); min-height: 22px; }
+.sechead h3 { margin: 0; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.sechead .chips { display: flex; gap: var(--sp1); margin-left: auto; white-space: nowrap; }  /* three chips drop under the heading on a phone */
 .sechead .chip { margin: 0; }
 .forwhat { align-self: center; color: var(--muted); font-size: var(--fs-s); }
 table.mx { width: 100%; margin-top: 3px; border-collapse: collapse; font-size: 14px; }
@@ -169,11 +169,13 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 13px; }
 #totals th:first-child { padding-left: 0; }
 #totals th[scope="row"], #totals tr:first-child th:first-child { text-align: left; }
 .keys { list-style: none; margin: var(--sp2) 0 0; padding: 6px 0 0; border-top: 1px solid var(--rule); }
-.keys li { display: flex; align-items: center; gap: var(--sp2); margin-top: var(--sp1); white-space: nowrap; }
+.keys li { display: flex; align-items: center; gap: var(--sp2); margin-top: var(--sp1); }
 .keys i { flex: none; width: 16px; height: 11px; border-radius: 2px; }
 .k-cap { background: linear-gradient(#2f78b7 0 3px, rgba(47, 120, 183, 0.25) 3px); border: 1px solid #2f78b7; }
 .k-bld { background: #5d636b; }
 .k-unm { background: repeating-linear-gradient(-45deg, #9a3412 0 1.5px, transparent 1.5px 4px); border: 1px solid #9a3412; }
+.k-walk { background: rgba(107, 63, 160, 0.16); }
+.k-trail { height: 3px !important; border-radius: 2px; background: #2f7d3a; }
 .k-pin { width: 11px !important; height: 11px; margin: 0 3px 0 2px; border-radius: 50% !important; background: #7c2d12; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px #c9b8ae; }
 .k-odd { background: repeating-linear-gradient(-45deg, #b45309 0 1px, transparent 1px 4px), repeating-linear-gradient(45deg, #b45309 0 1px, transparent 1px 4px); border: 1px dashed #b45309; }
 .maplibregl-ctrl-attrib { font-size: 11px; }

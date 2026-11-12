@@ -15,15 +15,18 @@
       <div class="seg" role="group" aria-label="Floor area ratio">
         <button type="button" data-far="base" aria-pressed="false">Base FAR</button>
         <button type="button" data-far="max" aria-pressed="true">Max FAR</button>
+        <button type="button" data-far="build" aria-pressed="false">Build-out</button>
       </div>
       <p id="farnote" class="note"></p>
       <details id="fold"><summary></summary><table id="totals" class="num"></table></details>
       <ul class="keys">
-        <li><i class="k-cap"></i>Height cap, reached with amenity incentives</li>
+        <li><i class="k-cap"></i><span id="k-cap"></span></li>
         <li><i class="k-bld"></i><span id="k-bld"></span></li>
         <li><i class="k-unm"></i><span id="k-unm"></span></li>
         <li><i class="k-odd"></i><span id="k-odd"></span></li>
         <li><i class="k-pin"></i><span id="k-pin"></span></li>
+        <li><i class="k-walk"></i><span id="k-walk"></span></li>
+        <li><i class="k-trail"></i>Eastrail, dashed where OpenStreetMap says it's being built</li>
       </ul>
     </div>
     <div id="nogl" hidden></div>

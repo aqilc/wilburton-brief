@@ -4,6 +4,7 @@ const $ = s => document.querySelector(s);
 const LAND = "425-452-4188";
 const NEW = ["UC", "MU-H", "MU-M", "MUR-M"];
 const CAP_COLOR = { UC: "#27358f", "MU-H": "#2f78b7", "MU-M": "#5aa0a8", "MUR-M": "#5aa0a8" };
+const RAIL = "#6b3fa0", TRAIL = "#2f7d3a", DRAWN = ["Wilburton", "East Main"];
 const lots = new Map(D.lots.map(l => [l.id, l]));
 const core = D.lots.filter(l => l.state === "ok");
 const odd = D.lots.filter(l => l.state === "split" || l.state === "nozone");
@@ -22,9 +23,36 @@ function street(a) {
 const title = l => street(l.addr) || `Parcel ${l.id}`;
 const capText = d => `up to ${rule(d, "height")} ft with amenity incentives`;
 
+// ---- build-out: one way a lot could fill in, all homes to its Max FAR and height cap on 11 ft floors, a rough 1,000 sq ft a home
+const FLOOR_FT = 11, HOME_SF = 1000, M_PER_FT = 0.3048;
+const PODIUM = rule("all", "floor_plate_from") / FLOOR_FT;  // the floor plate limit starts at 55 ft: 5 floors over the whole lot
+const homes = fa => Math.round(fa / HOME_SF / 10) * 10;
+function buildOut(l) {
+  const far = rule(l.zone, "max_far_res");
+  if (far != null) return { floors: Math.ceil(far), plate: l.sqft, fa: l.fa.max_res };  // MU-M, MUR-M: the whole lot, Max FAR floors high
+  const floors = Math.floor(rule(l.zone, "height") / FLOOR_FT), plate = Math.min(rule(l.zone, "floor_plate_res"), l.sqft);
+  return { floors, plate, fa: l.sqft * PODIUM + plate * (floors - PODIUM) };  // UC, MU-H: residential FAR is unlimited, so the cap and plate bound it
+}
+const bo = new Map(core.map(l => [l.id, buildOut(l)]));
+// the tower is the lot shrunk about its centroid to the plate's area
+const shrink = (poly, k) => { const [cx, cy] = centroid({ type: "Polygon", coordinates: poly }); return poly.map(r => r.map(([x, y]) => [cx + (x - cx) * k, cy + (y - cy) * k])); };
+const BO = { type: "FeatureCollection", features: D.map.caps.features.flatMap(f => {
+  const l = lots.get(f.properties.id), b = bo.get(l.id), top = b.floors * FLOOR_FT * M_PER_FT, p = f.properties;
+  if (b.plate === l.sqft) return [{ ...f, properties: { ...p, cap_m: top } }];
+  const g = f.geometry, k = Math.sqrt(b.plate / l.sqft), base = PODIUM * FLOOR_FT * M_PER_FT;
+  const tower = g.type === "Polygon" ? shrink(g.coordinates, k) : g.coordinates.map(poly => shrink(poly, k));
+  return [{ ...f, properties: { ...p, cap_m: base } }, { type: "Feature", geometry: { type: g.type, coordinates: tower }, properties: { ...p, base_m: base, cap_m: top } }];
+}) };
+function boNote(l) {
+  const b = bo.get(l.id);
+  const rest = b.plate === l.sqft ? " over the whole lot" : `: ${PODIUM} over the whole lot, then ${fmt(b.plate)} sq ft a floor`;
+  return `Build-out puts homes on ${b.floors} floors${rest}. About ${fmt(homes(b.fa))} homes at a rough ${fmt(HOME_SF)} sq ft each. One way the lot could fill in, not a forecast.`;
+}
+
 // ---- card
 const CHIP = { chart: "Chart 20.20.010", amen: "LUC 20.25R.050.D.1", b2: "LUC 20.25R.040.B.2", b3: "LUC 20.25R.040.B.3", c8: "LUC 20.20.525.C.8",
-  afj: "LUC 20.20.128.J", ph1: "LUC 20.25R.060.A.4", blk: "LUC 20.25R.020.B.2", rcw: "RCW 36.70A.840", park: "ESSB 5184" };
+  afj: "LUC 20.20.128.J", ph1: "LUC 20.25R.060.A.4", blk: "LUC 20.25R.020.B.2", rcw: "RCW 36.70A.840", park: "ESSB 5184",
+  sta: "RCW 36.70A.030", gc: "LUC 20.25R.020.C.3", gcw: "LUC 20.25R.030.G.3", gcd: "LUC 20.50.022" };
 const chip = k => `<button type="button" class="chip" data-cite="${k}" aria-expanded="false">${esc(CHIP[k].replace("LUC ", ""))}</button>`;
 const tr = (label, value, cites = [], sub = "") =>
   `<tr><th scope="row">${label}</th><td>${value}${sub ? `<span class="sub">${sub}</span>` : ""}</td><td class="cites">${cites.map(chip).join("")}</td></tr>`;
@@ -57,8 +85,15 @@ function lawSecs(l) {
   const afford = sec("Affordable homes", ["afj", "ph1"], `<p class="secval">Applies to a new building with ${all("afford_min_units")} or more homes, or more than ${fmt(all("afford_min_nonres_sf"))} sq ft of nonresidential floor area. For rent, one of: ${all("afford_rent_a_pct")}% of homes affordable at ${all("afford_rent_a_ami")}% of area median income, ${all("afford_rent_b_pct")}% at ${all("afford_rent_b_ami")}%, or ${all("afford_rent_c_pct")}% at ${all("afford_rent_c_ami")}%. The code also allows a fee in lieu, a land transfer or a mix.</p>
     <p class="secnote">In the ordinance's first phase it's ${all("afford_first_pct")}% at ${all("afford_first_ami")}% for rent, and the fee is ${all("afford_first_fee_cut")}% lower. Which phase applies is the Director's call, so ask Land Use at ${LAND}.</p>`);
   const blocks = l.sqft >= all("block_min_site_sf") ? sec("Blocks", ["blk"], `<p class="secval">On a site of ${fmt(all("block_min_site_sf"))} sq ft or more, a block runs at most ${fmt(all("block_perimeter_ft"))} ft around and ${all("block_ns_ft")} ft north to south, bordered by streets or access corridors.</p><p class="secnote">Sites between I-405 and 116th Ave NE, and parcels on 116th with light rail guideway, follow their own limits in the same section.</p>`) : "";
-  const law = sec("State law", ["park", "rcw"], `<p class="secval">Washington caps required parking at ${all("parking_max_per_home")} space per multifamily home. Cities must allow at least ${all("station_far_avg").toFixed(1)} FAR on average within a rail station area by December 31, 2029 at the latest.</p><p class="secnote">This page doesn't map station areas.</p>`);
-  return afford + blocks + law;
+  const law = sec("State law", ["park", "rcw", "sta"], `<p class="secval">Washington caps required parking at ${all("parking_max_per_home")} space per multifamily home. Cities must allow at least ${all("station_far_avg").toFixed(1)} FAR on average within a rail station area by December 31, 2029 at the latest.</p><p class="secval">${stationSentence(l)}</p><p class="secnote">The city can redraw a station area with the state Commerce department's approval, and can leave out parts of a lot such as critical areas (RCW 36.70A.840).</p>`);
+  const gc = sec("Grand Connection", ["gc", "gcw", "gcd"], `<p class="secval">A building next to an elevated segment of the Grand Connection gives the public direct access to it where feasible. Where a building adjoins the Grand Connection, 75% of that frontage holds active uses, level with any elevated segment.</p><p class="secnote">The ordinance names the Grand Connection, but this page found no published route for it, so it doesn't draw one or say which lots it passes.</p>`);
+  return afford + blocks + law + gc;
+}
+// a rail station area is every lot "fully or partially within one-half mile walking distance of an entrance" to a light rail station (RCW 36.70A.030); scripts/transit.py walks OpenStreetMap streets and paths from each entrance
+function stationSentence(l) {
+  const at = D.transit.lots[l.id];
+  if (!at) return "By this page's measure, this lot is outside every rail station area.";
+  return `By this page's measure, part of this lot is within a half-mile walk of ${at.length > 1 ? `entrances to the ${list(at)} stations` : `an entrance to ${at[0]} Station`}, along OpenStreetMap streets and paths.`;
 }
 function modelLine(l, ref = "the table above") {
   const s = D.sentences[l.id];
@@ -82,7 +117,7 @@ function cardHTML(l) {
   return `${head}<div class="distwrap"><p class="dist"><b>${d}</b> ${D.rules.districts[d]} ${chip("chart")}</p></div><p class="note">The parcel layer still says ${esc(l.old)}, from before the rezone.</p>
     ${sec("Height", ["chart", "amen"], `<div class="hero"><div><div class="stat">${rule(d, "height")}<small> ft</small></div><div class="statlab">cap, with amenity incentives</div></div><div>${stood}</div></div>${unm ? `<p class="note">${unm}</p>` : ""}`, `<span class="forwhat">Cap</span>`)}
     ${rule(d, "height") >= 100 ? sec("Above the cap", ["b2", "c8"], `<p class="secval">Mechanical equipment up to ${rule("all", "projection_mech")} ft more, ${rule("all", "projection_mech_lifesci")} ft with life&nbsp;science uses.</p>`) : ""}
-    ${sec("Floor area", ["chart", "amen"], `${mx(row("base", "Base FAR", far(rule(d, "base_far_nonres")), far(rule(d, "base_far_res"))) + row("base", "At base", sf(fa.base_nonres), sf(fa.base_res)) + row("max", "Max FAR", far(rule(d, "max_far_nonres")), far(rule(d, "max_far_res"))) + row("max", "At max", sf(fa.max_nonres), sf(fa.max_res)))}<p class="secnote">Max needs bonus floor area from amenity incentives.</p>`)}
+    ${sec("Floor area", ["chart", "amen"], `${mx(row("base", "Base FAR", far(rule(d, "base_far_nonres")), far(rule(d, "base_far_res"))) + row("base", "At base", sf(fa.base_nonres), sf(fa.base_res)) + row("max", "Max FAR", far(rule(d, "max_far_nonres")), far(rule(d, "max_far_res"))) + row("max", "At max", sf(fa.max_nonres), sf(fa.max_res)) + (farMode === "build" ? row("build", "Build-out", "None", sf(bo.get(l.id).fa)) : ""))}<p class="secnote">Max needs bonus floor area from amenity incentives.</p>${farMode === "build" ? `<p class="secnote">${boNote(l)}</p>` : ""}`)}
     ${plate ? sec("Floor plate", ["chart", "b3"], `${mx(row("", "Maximum", `${fmt(plate)} gsf`, `${fmt(rule(d, "floor_plate_res"))} gsf`))}<p class="secnote">Above ${rule("all", "floor_plate_from")} ft, where a building exceeds ${rule("all", "floor_plate_when_over")} ft.</p>`) : ""}
     <div class="more">${lawSecs(l)}${hazardSec(l)}${filedSec(l)}</div>
     ${modelLine(l, "the figures above")}${actions()}`;
@@ -278,7 +313,15 @@ qInput.addEventListener("blur", closeSugg);
 
 // ---- FAR toggle and totals
 function totals() {
-  const k = farMode === "base" ? "base" : "max";
+  $("#k-cap").textContent = farMode === "build" ? "Build-out, all homes" : "Height cap, reached with amenity incentives";
+  if (farMode === "build") {
+    const line = (d, ls) => { const fa = ls.reduce((a, l) => a + bo.get(l.id).fa, 0); return `<tr><th scope="row">${d}</th><td>${ls.length}</td><td>${fmt(fa)}</td><td>${fmt(homes(fa))}</td></tr>`; };
+    $("#fold summary").textContent = "Build-out by district";
+    $("#totals").innerHTML = `<caption>Across the ${core.length} single-district lots</caption><tr><th></th><th scope="col">Lots</th><th scope="col">Floor area, sq ft</th><th scope="col">Homes</th></tr>${NEW.map(d => line(d, core.filter(l => l.zone === d))).join("")}${line("All", core)}`;
+    $("#farnote").textContent = `Every lot built to its height cap and Max FAR with amenity incentives, all homes, on ${FLOOR_FT} ft floors at a rough ${fmt(HOME_SF)} sq ft a home. One way the lots could fill in, not a forecast.`;
+    return;
+  }
+  const k = farMode;
   const rows = NEW.map(d => {
     const ls = core.filter(l => l.zone === d);
     const nr = ls.reduce((a, l) => a + l.fa[`${k}_nonres`], 0);
@@ -296,7 +339,8 @@ function setFar(m) {
   document.querySelectorAll("[data-far]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.far === m)));
   totals();
   if (map) {
-    map.setPaintProperty("cap", "fill-extrusion-opacity", m === "base" ? 0.06 : 0.2);
+    map.getSource("caps").setData(m === "build" ? BO : D.map.caps);
+    map.setPaintProperty("cap", "fill-extrusion-opacity", { base: 0.06, max: 0.2, build: 0.55 }[m]);
     map.setPaintProperty("cap-roof", "fill-extrusion-opacity", m === "base" ? 0.12 : 0.6);
   }
   if (selected) { const scroll = $("#card").scrollTop; show(selected, { move: false }); $("#card").scrollTop = scroll; }
@@ -331,23 +375,35 @@ function startMap() {
     for (const k of ["lots", "caps", "bld", "unm", "labels"]) map.addSource(k, { type: "geojson", data: D.map[k] });
     const odd = ["in", ["get", "state"], ["literal", ["split", "nozone"]]];
     map.addLayer({ id: "lot-fill", type: "fill", source: "lots", paint: { "fill-color": "#000", "fill-opacity": 0 } });
+    // the two 2 Line stations in the district (win.md build 3); the card also names Bellevue Downtown, Spring District and BelRed where their walk reaches a lot
+    const drawn = f => DRAWN.includes(f.properties.name);
+    map.addSource("walk", { type: "geojson", data: { type: "FeatureCollection", features: D.transit.walk.features.filter(drawn) } });
+    map.addSource("trail", { type: "geojson", data: D.transit.eastrail });
+    map.addSource("sta", { type: "geojson", data: { type: "FeatureCollection", features: D.transit.stations.map(s => ({ type: "Feature", geometry: { type: "Point", coordinates: s.at }, properties: { name: s.name, label: `${s.name} Station` } })).filter(drawn) } });
+    map.addLayer({ id: "walk-fill", type: "fill", source: "walk", paint: { "fill-color": RAIL, "fill-opacity": 0.1 } });
     map.addLayer({ id: "odd-fill", type: "fill", source: "lots", filter: odd, paint: { "fill-pattern": "hatch2", "fill-opacity": 0.7 } });
     map.addLayer({ id: "lot-line", type: "line", source: "lots", paint: { "line-color": ["case", ["==", ["get", "state"], "ok"], "#5b6b7a", "#9aa4ad"], "line-width": ["case", ["==", ["get", "state"], "ok"], 0.9, 0.5] } });
     map.addLayer({ id: "odd-line", type: "line", source: "lots", filter: odd, paint: { "line-color": "#b45309", "line-width": 1.6, "line-dasharray": [2, 1.5] } });
     map.addLayer({ id: "unm", type: "fill", source: "unm", paint: { "fill-pattern": "hatch" } });
     map.addLayer({ id: "unm-line", type: "line", source: "unm", paint: { "line-color": "#9a3412", "line-width": 1 } });
+    map.addLayer({ id: "trail", type: "line", source: "trail", filter: ["get", "open"], layout: { "line-cap": "round" }, paint: { "line-color": TRAIL, "line-width": 3 } });
+    map.addLayer({ id: "trail-built", type: "line", source: "trail", filter: ["!", ["get", "open"]], paint: { "line-color": TRAIL, "line-width": 3, "line-dasharray": [1.5, 1.2] } });
     map.addLayer({ id: "sel-line", type: "line", source: "lots", filter: ["==", ["get", "id"], ""], paint: { "line-color": "#111", "line-width": 3 } });
     map.addLayer({ id: "bld", type: "fill-extrusion", source: "bld", paint: { "fill-extrusion-color": "#5d636b", "fill-extrusion-height": ["max", ["get", "h"], 1], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
-    map.addLayer({ id: "cap", type: "fill-extrusion", source: "caps", paint: { "fill-extrusion-color": ["match", ["get", "zone"], "UC", CAP_COLOR.UC, "MU-H", CAP_COLOR["MU-H"], CAP_COLOR["MU-M"]], "fill-extrusion-height": ["get", "cap_m"], "fill-extrusion-opacity": 0.2, "fill-extrusion-opacity-transition": { duration: 200 } } });
+    const base = ["coalesce", ["get", "base_m"], 0];  // a build-out tower stands on its podium
+    map.addLayer({ id: "cap", type: "fill-extrusion", source: "caps", paint: { "fill-extrusion-color": ["match", ["get", "zone"], "UC", CAP_COLOR.UC, "MU-H", CAP_COLOR["MU-H"], CAP_COLOR["MU-M"]], "fill-extrusion-base": base, "fill-extrusion-height": ["get", "cap_m"], "fill-extrusion-opacity": 0.2, "fill-extrusion-opacity-transition": { duration: 200 } } });
     // a thin slab at the cap height, so the glass reads as a ceiling at 100, 250 or 450 ft
     map.addLayer({ id: "cap-roof", type: "fill-extrusion", source: "caps", paint: { "fill-extrusion-color": ["match", ["get", "zone"], "UC", CAP_COLOR.UC, "MU-H", CAP_COLOR["MU-H"], CAP_COLOR["MU-M"]], "fill-extrusion-base": ["-", ["get", "cap_m"], 1.5], "fill-extrusion-height": ["get", "cap_m"], "fill-extrusion-opacity": 0.6, "fill-extrusion-opacity-transition": { duration: 200 } } });
-    map.addLayer({ id: "cap-sel", type: "fill-extrusion", source: "caps", filter: ["==", ["get", "id"], ""], paint: { "fill-extrusion-color": "#0b2540", "fill-extrusion-height": ["get", "cap_m"], "fill-extrusion-opacity": 0.5 } });
+    map.addLayer({ id: "cap-sel", type: "fill-extrusion", source: "caps", filter: ["==", ["get", "id"], ""], paint: { "fill-extrusion-color": "#0b2540", "fill-extrusion-base": base, "fill-extrusion-height": ["get", "cap_m"], "fill-extrusion-opacity": 0.5 } });
     map.addLayer({ id: "zone-label", type: "symbol", source: "labels", layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-max-width": 9, "text-allow-overlap": false }, paint: { "text-color": "#0b2540", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
     // a dot on each lot with a filing since the rezone, drawn over the glass so it reads from any angle
     const pins = D.map.lots.features.filter(f => D.feed.filed[f.properties.id]).map(f => ({ type: "Feature", geometry: { type: "Point", coordinates: centroid(f.geometry) }, properties: { id: f.properties.id } }));
     map.addSource("pins", { type: "geojson", data: { type: "FeatureCollection", features: pins } });
     map.addLayer({ id: "pin", type: "circle", source: "pins", paint: { "circle-radius": 4.5, "circle-color": "#7c2d12", "circle-stroke-color": "#fff", "circle-stroke-width": 1.5, "circle-pitch-alignment": "viewport" } });
+    map.addLayer({ id: "sta", type: "circle", source: "sta", paint: { "circle-radius": 6, "circle-color": RAIL, "circle-stroke-color": "#fff", "circle-stroke-width": 2, "circle-pitch-alignment": "viewport" } });
     for (const l of window.WB_BASEMAP.labels) map.addLayer(l);
+    // above the basemap's labels, so a street name gives way to a station's
+    map.addLayer({ id: "sta-label", type: "symbol", source: "sta", layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Bold"], "text-size": 12, "text-anchor": "left", "text-offset": [0.9, 0] }, paint: { "text-color": RAIL, "text-halo-color": "#fff", "text-halo-width": 1.6 } });
     // MapLibre draws a label half off the canvas edge; keep only the zone labels that fit (text-max-width 9 em is about 110 px)
     const fitLabels = () => {
       const { clientWidth: w, clientHeight: h } = map.getCanvas();
@@ -356,18 +412,107 @@ function startMap() {
     };
     fitLabels();
     map.on("moveend", fitLabels);
-    // the ground under the pointer first: at pitch 68 a front lot's glass covers the lots behind it
-    map.on("click", e => {
-      const f = map.queryRenderedFeatures(e.point, { layers: ["lot-fill"] })[0] || map.queryRenderedFeatures(e.point, { layers: ["cap"] })[0];
-      if (f) show(f.properties.id, { move: true });
-    });
-    // one query, so leaving the glass while still over a lot keeps the pointer
-    map.on("mousemove", e => (map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ["lot-fill", "cap"] }).length ? "pointer" : ""));
+    // the glass under the pointer, the nearest first; the ground is the fallback. Hover deepens that same pick (asst-122-3).
+    const hit = pt => map.queryRenderedFeatures(pt, { layers: ["cap"] })[0] || map.queryRenderedFeatures(pt, { layers: ["lot-fill"] })[0];
+    map.on("click", e => { const f = hit(e.point); if (f) show(f.properties.id, { move: true }); });
+    if (!matchMedia("(pointer: coarse)").matches) gestures(hit);
     if (selected) show(selected, { move: true });
     // compact credit starts open and covers a third of a phone map; the (i) keeps it one tap away
     document.querySelector(".maplibregl-compact-show")?.classList.remove("maplibregl-compact-show");
     window.__ready = performance.now();
   });
+}
+
+// Two-finger scroll pans, pinch zooms, Option turns and tilts, a twist turns in Safari. Middle-drag pans; every other mouse input stays as MapLibre ships it.
+function gestures(hit) {
+  const m = map, sz = m.scrollZoom;
+  const NOTCH = 4.000244140625;   // MapLibre's constant: a delta divisible by it is a mouse wheel
+  const TURN = 0.4, TILT = 0.25;  // half the right-drag rates, momentum about doubles a swipe
+  let kind = null, last = 0, turning = false, held = [0, 0], settling = 0;
+
+  // MapLibre v4.7.1's ScrollZoom.wheel test, kept per gesture, plus deltaX: a wheel has none. null: undecided, its 40 ms timer holds the event.
+  const classify = (v, dx, gap) => {
+    if (v && v % NOTCH === 0) kind = "wheel";
+    else if (dx || (v && Math.abs(v) < 4)) kind = "trackpad";
+    else if (gap > 400) kind = null;
+    else kind ||= sz._type || (Math.abs(gap * v) < 200 ? "trackpad" : "wheel");
+  };
+  // One moveend per gesture, as a drag fires: the page's moveend reruns setFilter on the labels.
+  const fire = m.fire;
+  m.fire = function (ev, ...rest) { return settling && ev.type === "moveend" ? this : fire.call(this, ev, ...rest); };
+  const settle = () => {
+    clearTimeout(settling);
+    settling = setTimeout(() => { settling = 0; m.fire("moveend"); }, 150);
+  };
+  const steer = (dx, dy) => {
+    settle();
+    if (turning) m.jumpTo({ bearing: m.getBearing() - dx * TURN, pitch: m.getPitch() + dy * TILT });  // the transform clamps pitch to maxPitch
+    else m.panBy([dx, dy], { duration: 0 });
+  };
+  m.getCanvasContainer().addEventListener("wheel", e => {
+    if (e.ctrlKey) return;  // a pinch: MapLibre zooms at the cursor
+    const unit = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? 40 : 1;
+    const dx = e.deltaX * unit, dy = e.deltaY * unit;
+    const now = performance.now(), gap = now - last;
+    last = now;
+    if (e.altKey) turning = true;  // Option turns the moment it is down, even mid-swipe
+    else if (gap > 150) turning = false;  // latched: letting go of Option mid-momentum must not start a pan
+    classify(dy, dx, gap);
+    const [heldX, heldY] = held;
+    held = kind ? [0, 0] : [dx, dy];
+    if (kind !== "trackpad") return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    clearTimeout(sz._timeout);  // the first event of the gesture went through undecided, its zoom must not land
+    steer(dx + heldX, dy + heldY);
+  }, { capture: true, passive: false });
+
+  // Option-drag joins right-drag and Ctrl-drag. MapLibre has no option for this; v4.7.1 is vendored.
+  for (const h of [m.dragRotate._mouseRotate, m.dragRotate._mousePitch]) {
+    const ok = h._moveStateManager._correctEvent;
+    h._moveStateManager._correctEvent = e => ok(e) || (e.button === 0 && e.altKey);
+  }
+  const pan = m.dragPan._mousePan._moveStateManager, panOk = pan._correctEvent;
+  pan._correctEvent = e => (panOk(e) && !e.altKey) || e.button === 1;
+  // Middle-drag pans, as 3D programs do. MapLibre's held-button table has no middle button, so this manager checks it here.
+  const stillDown = pan.isValidMoveEvent;
+  pan.isValidMoveEvent = e => pan._eventButton === 1 ? (e.buttons & 4) === 4 : stillDown.call(pan, e);
+  m.getCanvasContainer().addEventListener("mousedown", e => { if (e.button === 1) e.preventDefault(); });  // no autoscroll puck on Windows
+
+  // Safari is the only Mac browser that passes a trackpad twist to the page (GestureEvent.rotation, degrees clockwise); Chromium drops it.
+  let twistFrom;
+  const canvas = m.getCanvasContainer();
+  canvas.addEventListener("gesturestart", e => { e.preventDefault(); twistFrom = m.getBearing(); });
+  canvas.addEventListener("gesturechange", e => { e.preventDefault(); m.jumpTo({ bearing: twistFrom - e.rotation }); });
+
+  const hint = document.createElement("p");
+  hint.className = "note";
+  hint.id = "maphint";
+  hint.textContent = `Hold ${/Mac/.test(navigator.platform) ? "⌥" : "Alt"} and scroll to rotate`;
+  document.querySelector("#legend").append(hint);
+
+  if (!matchMedia("(hover: hover)").matches) return;  // a phone has no pointer to follow
+
+  // One small source per hover, so a change retiles one lot's polygons, never the page's caps and lots.
+  const group = fcol => fcol.features.reduce((all, f) => (all.get(f.properties.id)?.push(f) || all.set(f.properties.id, [f]), all), new Map());
+  const caps = group(D.map.caps), blocks = group(BO), lots = group(D.map.lots), fc = features => ({ type: "FeatureCollection", features });
+  for (const k of ["hov-cap", "hov-lot"]) m.addSource(k, { type: "geojson", data: fc([]) });
+  const zone = ["match", ["get", "zone"], "UC", "#27358f", "MU-H", "#2f78b7", "#5aa0a8"];
+  m.addLayer({ id: "hov", type: "fill-extrusion", source: "hov-cap", paint: { "fill-extrusion-color": zone, "fill-extrusion-base": ["coalesce", ["get", "base_m"], 0], "fill-extrusion-height": ["get", "cap_m"], "fill-extrusion-opacity": 0.42 } }, "cap-sel");
+  m.addLayer({ id: "hov-line", type: "line", source: "hov-lot", paint: { "line-color": "#1c2733", "line-width": 2 } }, "sel-line");
+  let cur = "", at = null, queued = 0;
+  const set = id => {
+    if (id === cur) return;
+    cur = id;
+    m.getCanvas().style.cursor = id ? "pointer" : "";
+    m.getSource("hov-cap").setData(fc((farMode === "build" ? blocks : caps).get(id) ?? []));
+    m.getSource("hov-lot").setData(fc(lots.get(id) ?? []));
+  };
+  const look = () => { queued = 0; if (at && !m.isMoving()) set(hit(at)?.properties.id ?? ""); };
+  const ask = () => { queued ||= requestAnimationFrame(look); };  // at most one query a frame
+  m.on("mousemove", e => { at = e.point; ask(); });
+  m.on("moveend", ask);  // the map slid under a still pointer
+  m.getCanvas().addEventListener("mouseleave", () => { at = null; set(""); });
 }
 
 function noGL() {
@@ -401,8 +546,11 @@ $("#k-bld").textContent = `Building, height from 2021 lidar (${D.map.bld.feature
 $("#k-unm").textContent = `Footprint, no measured height (${D.map.unm.features.length})`;
 $("#k-odd").textContent = `Split lot or no district (${odd.length}), not answered`;
 $("#k-pin").textContent = `Lot with a filing since the rezone (${Object.keys(D.feed.filed).length})`;
-$("#manifest ul").innerHTML = D.feed.sources.map(x => `<li><b>${esc(x.name)}</b><span>${esc(x.by)}, ${esc(x.got)}</span><span>${esc(x.terms)}</span></li>`).join("");
-$("#sources").textContent = `Code: Ordinance 6846 (Chart 20.20.010, LUC 20.25R, LUC 20.20.525). Districts: City of Bellevue zoning layer (Ord 6847). The parcel layer's own zoning column predates the rezone on all ${D.feed.lots} lots in the new districts, so this page reads the zoning polygons. Parcels, buildings and zoning pulled from the city's GIS on Nov 4, 2026. Heights measured from the King County West 2021 lidar flight and not checked against plans.`;
+Object.assign(D.rules.quotes, D.transit.quotes);
+$("#k-walk").textContent = `Half-mile walk from ${DRAWN.join(" or ")} Station`;
+const sources = [...D.feed.sources, { name: "Streets, paths, light rail entrances and Eastrail", by: "OpenStreetMap contributors", got: `pulled ${day(D.transit.pulled)}`, terms: "ODbL" }];
+$("#manifest ul").innerHTML = sources.map(x => `<li><b>${esc(x.name)}</b><span>${esc(x.by)}, ${esc(x.got)}</span><span>${esc(x.terms)}</span></li>`).join("");
+$("#sources").textContent = `Code: Ordinance 6846 (Chart 20.20.010, LUC 20.25R, LUC 20.20.525). Districts: City of Bellevue zoning layer (Ord 6847). The parcel layer's own zoning column predates the rezone on all ${D.feed.lots} lots in the new districts, so this page reads the zoning polygons. Parcels, buildings and zoning pulled from the city's GIS on Nov 4, 2026. Heights measured from the King County West 2021 lidar flight and not checked against plans. Station walks, Eastrail and station entrances from OpenStreetMap, pulled ${day(D.transit.pulled)}.`;
 document.querySelectorAll("[data-far]").forEach(b => b.addEventListener("click", () => setFar(b.dataset.far)));
 $("#card").addEventListener("click", e => {
   const c = e.target.closest(".chip");
