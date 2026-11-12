@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>What changed in the Wilburton rezone</title>
+<link rel="stylesheet" href="style.css">
+<body class="page">
+<main class="doc">
+  <p><a href="index.html">Back to the map</a></p>
+  <h1>What changed in the Wilburton rezone</h1>
+  <p class="lede" id="lede"></p>
+  <h2>Old zone to new district, by lot count</h2>
+  <div class="scroll"><table class="num grid" id="matrix"></table></div>
+  <h2>Every lot</h2>
+  <p class="note">Old caps for height and floor area aren't loaded here, so this page names the old zone only. A lot split between districts lists each share.</p>
+  <div class="scroll"><table class="num grid" id="lots"><thead><tr><th scope="col">Lot</th><th scope="col">Parcel</th><th scope="col">Before (parcel layer)</th><th scope="col">Now (zoning polygons)</th><th scope="col">Filed since</th></tr></thead><tbody></tbody></table></div>
+</main>
+<script src="data/bundle.js"></script>
+<script>
+// one page, no map: the old zone each lot's parcel record still carries against the district the city's zoning layer now draws
+const D = window.WB, NEW = ["UC", "MU-H", "MU-M", "MUR-M"];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const street = a => a.split(/\s+/).map(w => /^(N|S|E|W|NE|NW|SE|SW)$/.test(w) ? w : /^\d+(ST|ND|RD|TH)$/.test(w) ? w.toLowerCase() : w.toLowerCase().replace(/(^|-)[a-z]/g, c => c.toUpperCase())).join(" ");
+const day = iso => new Date(`${iso}T12:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const lots = D.lots.filter(l => ["ok", "split", "nozone"].includes(l.state));
+const now = l => l.state === "ok" ? l.zone : l.state === "nozone" ? "No district" : "Split";
+const olds = [...new Set(lots.map(l => l.old))].sort((a, b) => lots.filter(l => l.old === b).length - lots.filter(l => l.old === a).length);
+const cols = [...NEW, "Split", "No district"];
+document.getElementById("lede").textContent = `The Wilburton rezone, adopted ${day(D.feed.rezone)} (Ordinance 6846), redrew ${lots.length} lots into four new districts. The parcel layer's zoning column, and Washington's statewide zoning atlas, still show the old zones on these lots. Since the rezone the city's permit data shows filings on ${Object.keys(D.feed.filed).length} of them, through ${day(D.feed.latest)}.`;
+document.getElementById("matrix").innerHTML = `<thead><tr><th scope="col">Old zone</th>${cols.map(c => `<th scope="col">${c}</th>`).join("")}<th scope="col">Lots</th></tr></thead><tbody>${olds.map(o => {
+  const ls = lots.filter(l => l.old === o);
+  return `<tr><th scope="row">${esc(o)}</th>${cols.map(c => { const n = ls.filter(l => now(l) === c).length; return `<td>${n || ""}</td>`; }).join("")}<td>${ls.length}</td></tr>`;
+}).join("")}</tbody>`;
+// by address, lots with none last
+const byAddr = (a, b) => !a.addr - !b.addr || (a.addr || a.id).localeCompare(b.addr || b.id, "en", { numeric: true });
+document.querySelector("#lots tbody").innerHTML = lots.sort(byAddr).map(l => {
+  const nowText = l.state === "ok" ? l.zone : l.state === "nozone" ? "In no zoning polygon" : Object.entries(l.share).sort((a, b) => b[1] - a[1]).map(([z, v]) => `${z} ${Math.round(v * 100)}%`).join(", ");
+  const n = (D.feed.filed[l.id] ?? []).length;
+  return `<tr><th scope="row"><a href="index.html#${l.id}">${esc(l.addr ? street(l.addr) : `Parcel ${l.id}`)}</a></th><td>${l.id}</td><td>${esc(l.old)}</td><td>${esc(nowText)}</td><td>${n || ""}</td></tr>`;
+}).join("");
+</script>
+</body>
+</html>

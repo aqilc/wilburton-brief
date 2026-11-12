@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Use counts on this computer</title>
+<link rel="stylesheet" href="style.css">
+<body class="page">
+<main class="doc">
+  <p><a href="index.html">Back to the map</a></p>
+  <h1>Use counts on this computer</h1>
+  <p class="lede">The map counts what happens in this browser and keeps the numbers here. Nothing is sent anywhere, so each computer has its own counts. Download the file once a week and send it on.</p>
+  <table class="num grid" id="counts"></table>
+  <p class="actions"><button type="button" id="dl">Download CSV</button></p>
+</main>
+<script>
+// the counts app.js tally() keeps in localStorage under "wb-tally"
+const ROWS = [["answered", "Lot cards with figures"], ["refused", "Lot cards the page couldn't answer (split, no district, outside the new districts)"], ["quotes", "Code sections opened"], ["reports", "Wrong figures reported (copied or opened in email)"]];
+let t = {};
+try { t = JSON.parse(localStorage.getItem("wb-tally") || "{}"); } catch {}
+const since = t.since ? new Date(`${t.since}T12:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the first card opened";
+document.getElementById("counts").innerHTML = `<caption>Since ${since}</caption><tbody>${ROWS.map(([k, label]) => `<tr><th scope="row">${label}</th><td>${(t[k] ?? 0).toLocaleString("en-US")}</td></tr>`).join("")}</tbody>`;
+document.getElementById("dl").addEventListener("click", () => {
+  const csv = [["Count", "Value", "Since"], ...ROWS.map(([k, label]) => [label, t[k] ?? 0, t.since ?? ""])].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: `wilburton-counts-${new Date().toISOString().slice(0, 10)}.csv` });
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+</script>
+</body>
+</html>

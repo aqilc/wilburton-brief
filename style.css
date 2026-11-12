@@ -1,0 +1,283 @@
+:root {
+  --ink: #1c2126; --muted: #5a646d; --faint: #69727a; --rule: #dde1e4; --paper: #fbfaf8; --tint: #f1f0ec;
+  --accent: #1f4e79; --warn: #9a3412;
+  --sp1: 4px; --sp2: 8px; --sp3: 12px; --sp4: 16px; --sp5: 24px;
+  --fs-s: 12px; --fs-m: 14px; --fs-l: 20px; --r: 6px;
+  font: 14px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--ink); background: var(--paper);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+#app { display: grid; grid-template-columns: 1fr 420px; height: 100vh; }
+#mapwrap { position: relative; min-height: 0; }
+#map { position: absolute; inset: 0; }
+#panel { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; border-left: 1px solid var(--rule); background: var(--paper); }
+#panel header, #card, #panel footer { padding: var(--sp4) var(--sp5); }
+h1 { font-size: var(--fs-l); line-height: 1.25; margin: 0 0 var(--sp2); font-weight: 600; letter-spacing: -0.005em; }
+.lede { margin: 0 0 var(--sp4); color: var(--muted); }
+.note { color: var(--muted); font-size: var(--fs-s); margin: var(--sp2) 0 0; }
+.note, .sub, .secval, .secnote, #farnote { text-wrap: pretty; }
+.num { font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* find */
+#find label { display: block; font-weight: 600; margin-bottom: var(--sp1); }
+#find .row { position: relative; display: flex; gap: var(--sp2); }
+#find input { flex: 1; min-width: 0; height: 36px; padding: 0 var(--sp3); font: inherit; border: 1px solid #858e96; border-radius: var(--r); background: #fff; }
+#find input:focus-visible, button:focus-visible, .chartwrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* first Tab stop: without WebGL the lot table puts 147 buttons ahead of the search box */
+.skip { position: absolute; left: var(--sp2); top: -48px; z-index: 10; padding: var(--sp2) var(--sp3); background: #fff; color: var(--accent); border-radius: var(--r); box-shadow: 0 1px 2px rgba(20, 28, 36, 0.12), 0 8px 24px rgba(20, 28, 36, 0.14); }
+.skip:focus { top: var(--sp2); }
+#find button, .actions button { height: 36px; padding: 0 var(--sp4); border: 1px solid #b9c0c6; border-radius: var(--r); background: #fff; }
+#find button:hover, .actions button:hover { background: var(--tint); }
+#findmsg:empty { display: none; }
+#q::-webkit-search-cancel-button { -webkit-appearance: none; width: 12px; height: 12px; cursor: pointer; background: var(--muted); mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2 2l8 8M10 2l-8 8' stroke='black' stroke-width='1.6' stroke-linecap='round'/></svg>") center / contain no-repeat; }
+.sugg { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; margin: 0; padding: 4px; list-style: none; background: #fff; border-radius: 8px; box-shadow: 0 0 0 1px rgba(20, 28, 36, 0.08), 0 8px 24px rgba(20, 28, 36, 0.18); }
+.sugg li { display: flex; justify-content: space-between; gap: var(--sp3); padding: 6px var(--sp2); border-radius: 5px; cursor: pointer; }
+.sugg li[aria-selected="true"], .sugg li:hover { background: #e9eff5; }
+.sugg li.more { color: var(--muted); font-size: var(--fs-s); cursor: default; }
+.sugg li.more:hover { background: none; }
+.sugg .z { color: var(--muted); font-size: var(--fs-s); font-variant-numeric: tabular-nums; }
+
+/* card */
+#card { border-top: 1px solid var(--rule); flex: none; outline: none; }
+#card h2 { font-size: 18px; margin: 0; font-weight: 600; outline: none; }
+.meta { margin: 2px 0 var(--sp3); color: var(--muted); }
+.hint { color: var(--muted); margin: 0; }
+.state { margin: 0 0 var(--sp3); padding: var(--sp3); background: #fbf1e7; border-radius: var(--r); }
+table.facts { width: 100%; border-collapse: collapse; }
+.facts caption { text-align: left; color: var(--muted); font-size: var(--fs-s); padding-bottom: var(--sp1); }
+.facts th, .facts td { text-align: left; vertical-align: top; padding: var(--sp2) 0; border-top: 1px solid var(--rule); }
+.facts th { width: 104px; padding-right: var(--sp3); font-weight: 600; color: var(--muted); font-size: 13px; }
+.facts td { font-size: 15px; }
+.facts .sub { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.facts td.cites { width: 1%; white-space: nowrap; text-align: right; padding-left: var(--sp2); }
+.chip { display: inline-block; margin: 0 0 var(--sp1) var(--sp1); padding: 2px 7px; font-size: 11.5px; line-height: 16px; font-weight: 500; border: 0; border-radius: 4px; background: #e9eff5; color: var(--accent); }
+.facts td.cites .chip { display: block; margin-left: auto; }
+.chip:hover:not([aria-expanded="true"]) { background: #dce6f0; }
+.chip[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+tr.qrow > td { padding: 0 0 var(--sp3); border-top: 0; }
+/* width 0 + min-width 100%: the chart scrolls inside the card instead of widening the panel */
+.quote { width: 0; min-width: 100%; background: var(--tint); border-radius: 8px; padding: var(--sp3) var(--sp4); font-family: Georgia, "Times New Roman", serif; font-size: 13.5px; line-height: 1.45; animation: qin 0.18s cubic-bezier(0.2, 0, 0, 1); }
+@keyframes qin { from { opacity: 0; transform: translateY(-3px); } }
+.quote p { margin: 0 0 var(--sp2); }
+.quote .qtitle { font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; font-weight: 600; font-size: 13px; }
+.quote .src { font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; color: var(--muted); font-size: var(--fs-s); margin: 0; }
+/* the chart's left rule sits on the scroller, so columns scrolling under the sticky labels can't show through it */
+.chartwrap { overflow-x: auto; margin: var(--sp1) 0 var(--sp3); border-left: 1px solid var(--rule); container-type: inline-size; scroll-snap-type: x mandatory; scroll-padding-left: 96px; }
+/* the fade says more columns lie to the right, and goes at the end of the scroll; 0 when the timeline is inactive, so a chart that fits has none */
+@property --chart-fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@supports (animation-timeline: scroll()) { .chartwrap { mask-image: linear-gradient(to right, #000 calc(100% - var(--chart-fade)), transparent); animation: chart-end linear both; animation-timeline: scroll(self inline); } }
+@keyframes chart-end { from { --chart-fade: 28px; } to { --chart-fade: 0px; } }
+/* a narrow card shows three whole district columns beside the row labels and scrolls by whole columns, so no figure shows cut in half */
+@container (max-width: 575px) {
+  table.chart { table-layout: fixed; width: calc(200cqw - 96px); }
+  .chart tr > :first-child { width: 96px; }
+  .chart th[scope="col"] { width: calc((100cqw - 96px) / 3); scroll-snap-align: start; }
+}
+table.chart { border-collapse: collapse; width: 100%; margin: 0; font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; font-size: 12px; background: #fff; }
+.chart th, .chart td { border: 1px solid var(--rule); padding: 3px 5px; text-align: center; }
+.chart th[scope="row"] { text-align: left; font-weight: 500; }
+/* row labels stay put while the district columns scroll */
+.chart tr > :first-child { position: sticky; left: 0; border-left: 0; background: #fff; box-shadow: inset -1px 0 var(--rule); }
+.chart th span { font-weight: 400; color: var(--muted); }
+.chart .on { background: #e4edf6; font-weight: 600; }
+.model { margin: var(--sp4) 0 0; padding-top: var(--sp3); border-top: 1px solid var(--rule); }
+.model blockquote { margin: 0; font-size: 15px; }
+.model figcaption { margin-top: var(--sp1); color: var(--faint); font-size: var(--fs-s); }
+.actions { display: flex; gap: var(--sp2); flex-wrap: wrap; margin-top: var(--sp4); }
+#panel footer { border-top: 1px solid var(--rule); color: var(--muted); font-size: var(--fs-s); }
+#panel footer p { margin: 0 0 var(--sp2); }
+
+/* lot card: what the lot may reach beside what stands on it, then one aligned table */
+.dist { margin: 0; }
+.dist b { font-weight: 600; }
+.dist .chip { margin: 0 0 0 var(--sp1); vertical-align: 1px; }
+.hero { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 6px 0 0; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.hero > div { background: #fff; padding: 11px 13px 10px; }
+.stat { font-size: 30px; line-height: 34px; font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+.stat small { font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 1px; }
+.statlab { font-size: 12.5px; line-height: 16px; color: var(--muted); margin-top: 1px; text-wrap: balance; }
+.sec { margin-top: 14px; }
+.sechead { display: flex; align-items: center; justify-content: space-between; gap: var(--sp2); min-height: 22px; }
+.sechead h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.sechead .chips { display: flex; gap: var(--sp1); white-space: nowrap; }
+.sechead .chip { margin: 0; }
+.forwhat { align-self: center; color: var(--muted); font-size: var(--fs-s); }
+table.mx { width: 100%; margin-top: 3px; border-collapse: collapse; font-size: 14px; }
+.mx th, .mx td { padding: 6px 0; border-top: 1px solid var(--rule); text-align: right; white-space: nowrap; font-weight: 400; }
+.mx thead th { border-top: 0; padding: 2px 0 var(--sp1); font-size: var(--fs-s); color: var(--muted); }
+.mx tbody th { text-align: left; color: var(--muted); }
+.mx tr.on th { color: var(--accent); font-weight: 600; }
+.mx tr.on td { font-weight: 600; }
+.mx td { width: 31%; }
+.secnote { color: var(--muted); font-size: 13px; margin: var(--sp1) 0 0; }
+.secval { font-size: 14px; margin: var(--sp1) 0 0; }
+.sec .qrow { margin-top: var(--sp2); }
+.sec .quote { width: auto; min-width: 0; }
+.filed { list-style: none; margin: 3px 0 0; padding: 0; font-size: 14px; }
+.filed li { display: grid; grid-template-columns: 1fr auto; column-gap: var(--sp3); padding: 5px 0; border-top: 1px solid var(--rule); }
+.filed .num { color: var(--muted); white-space: nowrap; }
+.filed .sub { grid-column: 1 / -1; color: var(--muted); font-size: var(--fs-s); }
+.demand { margin: var(--sp3) 0 0; padding: 10px 13px; background: #fff; border: 1px solid var(--rule); border-radius: 10px; font-size: 13px; color: var(--muted); text-wrap: pretty; }
+.demand b { color: var(--ink); font-size: 15px; font-weight: 600; }
+.report { margin-top: var(--sp3); }
+.report label { display: block; color: var(--muted); font-size: 13px; margin-bottom: var(--sp1); }
+.report textarea { width: 100%; font: inherit; font-size: 13px; line-height: 1.4; padding: var(--sp2); border: 1px solid #858e96; border-radius: var(--r); resize: vertical; }
+.report .actions { margin-top: var(--sp2); align-items: center; }
+.report a { color: var(--accent); }
+.manifest { list-style: none; margin: var(--sp2) 0; padding: 0; }
+.manifest li { padding: 6px 0; border-top: 1px solid var(--rule); }
+.manifest b { font-weight: 500; color: var(--ink); }
+.manifest b, .manifest span { display: block; }
+#manifest { margin: 0 0 var(--sp2); }
+#manifest summary { justify-content: flex-start; padding: 0; color: var(--ink); }
+.pages { display: flex; gap: var(--sp4); flex-wrap: wrap; }
+.pages a { color: var(--accent); }
+
+/* changed.html and tally.html: one column of text and tables */
+.doc { max-width: 900px; margin: 0 auto; padding: var(--sp5) var(--sp4) 48px; }
+.doc a { color: var(--accent); }
+.doc h1 { font-size: var(--fs-l); margin: var(--sp2) 0; }
+.doc h2 { font-size: 15px; margin: var(--sp5) 0 var(--sp2); }
+.doc .scroll { overflow-x: auto; }
+table.grid { border-collapse: collapse; width: 100%; font-size: 13px; }
+.grid caption { text-align: left; color: var(--muted); padding-bottom: var(--sp1); }
+.grid th, .grid td { padding: 5px var(--sp3) 5px 0; border-top: 1px solid var(--rule); text-align: left; font-weight: 400; white-space: nowrap; }
+.grid thead th { border-top: 0; color: var(--muted); font-size: var(--fs-s); }
+.grid td { font-variant-numeric: tabular-nums; }
+#counts { max-width: 620px; }
+#counts th { white-space: normal; }
+#counts td { text-align: right; }
+.doc .actions button { height: 36px; padding: 0 var(--sp4); border: 1px solid #b9c0c6; border-radius: var(--r); background: #fff; }
+
+/* map overlay */
+.overlay { position: absolute; top: var(--sp3); left: var(--sp3); width: 356px; padding: 10px var(--sp3); background: rgba(251, 250, 248, 0.97); border-radius: 10px; box-shadow: 0 1px 2px rgba(20, 28, 36, 0.12), 0 8px 24px rgba(20, 28, 36, 0.14); font-size: var(--fs-s); }
+.seg { display: flex; border: 1px solid #b9c0c6; border-radius: var(--r); overflow: hidden; }
+.seg button { flex: 1; border: 0; background: #fff; padding: 5px 12px; font-size: 13px; font-weight: 500; }
+.seg button + button { border-left: 1px solid #b9c0c6; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+#farnote { line-height: 1.35; }
+#fold { margin-top: var(--sp2); border-top: 1px solid var(--rule); }
+#fold summary, #manifest summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: var(--sp2); padding: 7px 0 1px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+#fold summary::-webkit-details-marker, #manifest summary::-webkit-details-marker { display: none; }
+#fold summary::after, #manifest summary::after { content: ""; flex: none; width: 7px; height: 7px; margin-right: 3px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg) translate(-2px, -2px); transition: transform 0.16s cubic-bezier(0.2, 0, 0, 1); }
+#fold[open] summary::after, #manifest[open] summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+#totals { width: 100%; border-collapse: collapse; margin-top: 5px; }
+#totals caption { text-align: left; color: var(--muted); padding: 0 0 3px; }
+#totals th, #totals td { white-space: nowrap; padding: 3px 0 3px var(--sp2); text-align: right; border-top: 1px solid var(--rule); }
+#totals th:first-child { padding-left: 0; }
+#totals th[scope="row"], #totals tr:first-child th:first-child { text-align: left; }
+.keys { list-style: none; margin: var(--sp2) 0 0; padding: 6px 0 0; border-top: 1px solid var(--rule); }
+.keys li { display: flex; align-items: center; gap: var(--sp2); margin-top: var(--sp1); white-space: nowrap; }
+.keys i { flex: none; width: 16px; height: 11px; border-radius: 2px; }
+.k-cap { background: linear-gradient(#2f78b7 0 3px, rgba(47, 120, 183, 0.25) 3px); border: 1px solid #2f78b7; }
+.k-bld { background: #5d636b; }
+.k-unm { background: repeating-linear-gradient(-45deg, #9a3412 0 1.5px, transparent 1.5px 4px); border: 1px solid #9a3412; }
+.k-pin { width: 11px !important; height: 11px; margin: 0 3px 0 2px; border-radius: 50% !important; background: #7c2d12; box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px #c9b8ae; }
+.k-odd { background: repeating-linear-gradient(-45deg, #b45309 0 1px, transparent 1px 4px), repeating-linear-gradient(45deg, #b45309 0 1px, transparent 1px 4px); border: 1px dashed #b45309; }
+.maplibregl-ctrl-attrib { font-size: 11px; }
+
+/* no WebGL */
+#nogl { position: absolute; inset: 0; overflow: auto; padding: var(--sp5); background: var(--paper); }
+.nogl-msg { max-width: 640px; margin: 0 0 var(--sp4); padding: var(--sp3); background: #fbf1e7; border-radius: var(--r); }
+table.list { border-collapse: collapse; width: 100%; font-size: 13px; }
+.list th, .list td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.list thead th { position: sticky; top: calc(-1 * var(--sp5)); background: var(--paper); font-weight: 600; color: var(--muted); }
+.list tr.on { background: #e4edf6; }
+.scroll { overflow-x: auto; }
+.list .pid { display: block; color: var(--muted); font-weight: 400; font-size: var(--fs-s); }
+.linkish { border: 0; background: none; padding: 0; text-align: left; color: var(--accent); text-decoration: underline; text-decoration-color: #9fb6cc; text-underline-offset: 2px; }
+.linkish:hover { text-decoration-color: currentColor; }
+
+@media (max-width: 760px) {
+  #app { display: block; height: auto; }
+  #mapwrap { height: auto; }
+  #map { position: relative; height: 62vh; }
+  #panel { border-left: 0; overflow: visible; }
+  .overlay { position: static; width: auto; border-radius: 0; box-shadow: none; border-bottom: 1px solid var(--rule); }
+  /* the gray building is named in the lede; the hatch and crosshatch on the map need their keys */
+  #fold, .keys li:nth-child(2) { display: none; }
+  .keys li { line-height: 1.3; white-space: normal; }
+  #panel header, #card, #panel footer { padding: var(--sp4); }
+  .facts th { width: 88px; }
+  body.nogl #mapwrap { height: auto; }
+  body.nogl #map { display: none; }
+  body.nogl #nogl { position: static; padding: var(--sp4); }
+  /* seven columns don't fit 390 px: each lot stacks as a block, every value beside its column name */
+  #nogl .list thead { display: none; }
+  #nogl .list, #nogl .list tbody, #nogl .list tr, #nogl .list th { display: block; }
+  #nogl .list tr { padding: var(--sp2) 0; border-bottom: 1px solid var(--rule); }
+  #nogl .list th, #nogl .list td { border: 0; padding: 2px 0; }
+  #nogl .list td { display: flex; gap: var(--sp3); }
+  #nogl .list td::before { content: attr(data-label); flex: 0 0 152px; color: var(--muted); }
+  #find input, #find button, .actions button { height: 44px; }
+  /* changed.html at 390 px: eight count columns fit once their gaps shrink; the lot list drops the parcel column (the lot's card has it) and wraps */
+  .doc .grid th, .doc .grid td { padding-right: 6px; white-space: normal; }
+  #matrix { font-size: 12px; }
+  #lots :is(th, td):nth-child(2) { display: none; }
+  .chip { padding: 4px 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quote { animation: none; }
+  #fold summary::after, #manifest summary::after { transition: none; }
+}
+
+@page { margin: 0.5in; }
+@media print {
+  html, body { height: auto; }
+  #mapwrap, #find, .skip, .actions, .hint, .demand, .report, #manifest, .pages { display: none !important; }
+  #app { display: block; height: auto; }
+  #panel { border: 0; overflow: visible; }
+  #panel header, #card, #panel footer { padding: 0 0 6px; }
+  .lede { display: none; }
+  .chip { padding: 0 5px; font-size: 10.5px; line-height: 14px; border: 1px solid #999; background: none; color: #000; }
+  .chip[aria-expanded="true"] { background: #fff; color: #000; border-width: 2px; }
+  .quote { animation: none; background: none; border-left: 0; padding: 4px 0; font-size: 11px; line-height: 1.35; }
+  .quote p { margin-bottom: 3px; }
+  /* tighter rows so one card with any quote open fits a Letter page, checked in Verdana (wider than Segoe UI) */
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  #card h2 { font-size: 16px; }
+  .facts th, .facts td { padding-block: 4px; }
+  .facts td, .model blockquote { font-size: 12px; }
+  .facts .sub { font-size: 11px; margin-top: 0; }
+  .facts th { width: 150px; font-size: 12px; }
+  .chart th, .chart td { padding: 1px 4px; }
+  .chart td { white-space: nowrap; }
+  .chart tr > :first-child { width: 36%; }
+  .model { margin-top: var(--sp2); padding-top: 6px; }
+  .dist, .meta { margin-bottom: 0; }
+  .hero { margin-top: 2px; }
+  .hero > div { padding: 5px 8px 4px; }
+  .stat { font-size: 20px; line-height: 23px; }
+  .stat small { font-size: 12px; }
+  .statlab { font-size: 11px; line-height: 13px; margin-top: 0; }
+  .sec { margin-top: var(--sp1); }
+  .sechead { min-height: 18px; }
+  table.mx { font-size: 12px; margin-top: 0; }
+  .mx th, .mx td { padding-block: 1px; line-height: 1.3; }
+  .mx thead th { padding-block: 0; font-size: 11px; }
+  .secval { font-size: 12px; margin-top: 1px; }
+  .secnote, .note { font-size: 11px; line-height: 1.25; margin-top: 1px; }
+  .sec .qrow { margin-top: 3px; }
+  /* the sections after Floor plate print as one line of their names, so the card stays on one Letter page; one with its code text open prints whole, the text in three columns */
+  .more { display: flex; flex-wrap: wrap; column-gap: 5px; margin-top: 2px; font-size: 10.5px; line-height: 1.2; }
+  .more::before { content: "On the page, not printed here:"; color: #444; }
+  .more .sec { margin: 0; }
+  .more .sec:not(:has(.qrow)) > :not(.sechead), .more .sec:not(:has(.qrow)) .chips { display: none; }
+  .more .sec:not(:has(.qrow)) .sechead { min-height: 0; }
+  .more .sec:not(:has(.qrow)) h3 { font-size: 10.5px; line-height: 1.2; font-weight: 400; }
+  .more .sec:not(:has(.qrow)):not(:nth-last-child(1 of :not(:has(.qrow)))) h3::after { content: ","; }
+  .more .sec:has(.qrow) { order: -1; flex-basis: 100%; margin-bottom: 2px; }
+  .more .sec:has(.qrow) .secnote { display: none; }
+  .more .quote { columns: 3; column-gap: var(--sp4); font-size: 9px; line-height: 1.25; }
+  .more .quote p { margin-bottom: 2px; }
+  .more .quote .qtitle, .more .quote .src { column-span: all; }
+  #panel footer { font-size: 11px; line-height: 1.3; }
+  #panel footer p { margin-bottom: 3px; }
+  /* the prototype note runs into the sources paragraph, so it costs the printed page no line */
+  #proto, #sources { display: inline; }
+  .facts td.cites .chip { display: inline-block; }
+  body { background: #fff; }
+}

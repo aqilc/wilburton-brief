@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Wilburton zoning, allowed and measured</title>
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+<body>
+<a class="skip" href="#q">Skip to the address search</a>
+<main id="app">
+  <section id="mapwrap" aria-label="3D map">
+    <div id="map"></div>
+    <div id="legend" class="overlay">
+      <div class="seg" role="group" aria-label="Floor area ratio">
+        <button type="button" data-far="base" aria-pressed="false">Base FAR</button>
+        <button type="button" data-far="max" aria-pressed="true">Max FAR</button>
+      </div>
+      <p id="farnote" class="note"></p>
+      <details id="fold"><summary></summary><table id="totals" class="num"></table></details>
+      <ul class="keys">
+        <li><i class="k-cap"></i>Height cap, reached with amenity incentives</li>
+        <li><i class="k-bld"></i><span id="k-bld"></span></li>
+        <li><i class="k-unm"></i><span id="k-unm"></span></li>
+        <li><i class="k-odd"></i><span id="k-odd"></span></li>
+        <li><i class="k-pin"></i><span id="k-pin"></span></li>
+      </ul>
+    </div>
+    <div id="nogl" hidden></div>
+  </section>
+  <aside id="panel">
+    <header>
+      <h1>Wilburton zoning, allowed and measured</h1>
+      <p class="lede">Glass shows the height cap in each new Wilburton district under Ordinance 6846. A building reaches the cap only with bonus floor area earned through amenity incentives. Gray buildings are measured from the 2021 King County lidar.</p>
+      <form id="find" role="search">
+        <label for="q">Find a lot by address or parcel number</label>
+        <div class="row"><input id="q" type="search" role="combobox" aria-controls="sugg" aria-expanded="false" autocomplete="off" spellcheck="false" placeholder="316 116th Ave NE"><button type="submit">Find</button><ul id="sugg" class="sugg" role="listbox" hidden></ul></div>
+        <p id="findmsg" class="note" role="status"></p>
+      </form>
+    </header>
+    <article id="card" tabindex="-1" aria-live="polite"></article>
+    <footer>
+      <p>Not a zoning determination. For a lot this page can't answer, call Land Use at 425-452-4188.</p>
+      <p id="proto">A prototype. City of Bellevue staff haven't reviewed it.</p>
+      <p id="sources"></p>
+      <details id="manifest"><summary>Data sources, dates and terms</summary>
+        <ul class="manifest"></ul>
+        <p>Known gaps: the parcel layer's zoning column predates the rezone; the 2021 lidar misses anything built since; the hazard layers say what touches a lot, not how much of it.</p>
+      </details>
+      <p class="pages"><a href="changed.html">What changed in the rezone</a> <a href="tally.html">Use counts on this computer</a></p>
+    </footer>
+  </aside>
+</main>
+<script src="vendor/maplibre-gl.js"></script>
+<script src="vendor/basemap.js"></script>
+<script src="data/bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
